@@ -314,10 +314,13 @@ class Console(ImageOperation):
 		full_data = ""
 		cap = cv2.VideoCapture(filepath)
 		i = 0
+		length = -1
 		while cap.isOpened():
+			if length == -1:
+				length = cap.get(cv2.CAP_PROP_FRAME_COUNT)
 			ret, frame = cap.read()
 			if not silent:
-				self.log(f"<ccyan>Converting frame {i + 1}...<ce>")
+				self.log(f"<ccyan>Converting frame {i + 1}/{int(length)+1}...<ce>")
 			if ret:
 				pixelated = self.pixelize(frame, dimensions[0], dimensions[1])
 				pixels = self.resize(pixelated, dimensions[0], dimensions[1])
@@ -417,8 +420,21 @@ class Console(ImageOperation):
 							filetype = "video"
 						
 						if filetype is not None:
+							shape = (0, 0)
+							if file_info[1][1:] in params.SUPPORTED_EXTENSIONS["image"]:
+								image = cv2.imread(str(result[1]))
+								shape = (image.shape[1], image.shape[0])
+							elif file_info[1][1:] in params.SUPPORTED_EXTENSIONS["video"]:
+								vid = cv2.VideoCapture(str(result[1]))
+								_, first_frame = vid.read()
+								shape = (first_frame.shape[1], first_frame.shape[0])
+								vid.release()
+							
+							while shape[0] > params.X_LIMIT and shape[1] > params.Y_LIMIT:
+								shape = (int(shape[0] // 1.5), int(shape[1] // 1.5))
+							
 							self.log("<cblue>Enter dimensions of the output image separated with a space "
-									 "(leave empty for the default 20x20).<ce>")
+									 f"(leave empty for the default 20x20).\nRecommended: {shape[0]} {shape[1]}<ce>")
 							dimensions = self.get(">")
 							if dimensions == "":
 								dimensions = (20, 20)
@@ -433,7 +449,7 @@ class Console(ImageOperation):
 									if (dimensions[0] < 1) or (dimensions[1] < 1):
 										self.log(f"<cfail>Given dimensions are way too small.<ce>")
 										continue
-									if (dimensions[0] > 100) or (dimensions[1] > 100):
+									if (dimensions[0] > params.X_LIMIT) or (dimensions[1] > params.Y_LIMIT):
 										self.log("<cwarn>Given dimensions may cause lag and extensive memory usage.<ce>")
 								else:
 									self.log(f"<cfail>Invalid amount of arguments given. Expected 2, got {len(dimensions)}<ce>")
